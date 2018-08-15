@@ -15,7 +15,7 @@ public final class DelaunayTriangleUtil {
      * @param v result container
      * @return input vector v with result for chaining
      */
-    public static Vector2 centroid(DelaunayTriangle dt, Vector2 v) {
+    public static Vector2 dtCentroid(DelaunayTriangle dt, Vector2 v) {
         float cx = ( dt.points[0].getXf() + dt.points[1].getXf() + dt.points[2].getXf() ) / 3f;
         float cy = ( dt.points[0].getYf() + dt.points[1].getYf() + dt.points[2].getYf() ) / 3f;
 

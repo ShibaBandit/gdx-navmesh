@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import static com.shibabandit.gdx_navmesh.util.DelaunayTriangleUtil.centroid;
+import static com.shibabandit.gdx_navmesh.util.DelaunayTriangleUtil.dtCentroid;
 import static com.shibabandit.gdx_navmesh.util.DelaunayTriangleUtil.dtGetNeighborEdge;
 
 /**
@@ -114,7 +114,7 @@ public class NavMeshGraph implements INavMeshGraph<NavMeshPathNode> {
                     // Left and right portals can be determined by looking at the angles relative
                     // to the centroid. If the rotation angle from pvec1 to pvec2 is positive (CCW), pvec2
                     // is to the right of pvec1 from the standpoint of the centroid.
-                    centroid(t, centroid);
+                    dtCentroid(t, centroid);
                     v1AngDeg = Angles.between(centroid, pvec1);
                     v2AngDeg = Angles.between(centroid, pvec2);
 
