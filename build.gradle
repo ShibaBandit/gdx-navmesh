@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+}
+
+group 'com.shibabandit'
+version '0.1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+ext {
+    gdxVersion = '1.9.6'
+    aiVersion = '1.8.1'
+}
+
+dependencies {
+    compile "com.badlogicgames.gdx:gdx:$gdxVersion"
+    compile "com.badlogicgames.gdx:gdx-ai:$aiVersion"
+    compile 'org.locationtech.jts:jts-core:1.15.1'
+    compile 'org.orbisgis:poly2tri-core:0.1.2'
+
+    testCompile "com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion" // Should be for testing visually only
+    testCompile "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop" // Should be for testing visually only
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
