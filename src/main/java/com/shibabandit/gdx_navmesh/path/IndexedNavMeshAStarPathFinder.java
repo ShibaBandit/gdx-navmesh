@@ -27,14 +27,13 @@ import com.badlogic.gdx.utils.TimeUtils;
 /**
  * <p>Based on the {@link IndexedAStarPathFinder} by davebaol. Adapted due to OOP inheritance issues.</p>
  * <p>
- *     Changes:<br/>
+ *     Changes:<br>
  *     <ul>
  *         <li>Only supports NavMesh search.</li>
  *         <li>visitChildren() and search() require NavMeshPortalRequest to propagate agent radius.</li>
  *         <li>Different guard checks in search calls and create paths using connections.</li>
  *         <li>Refactored loop in search() to always check the openList size, replaced do/while with while.</li>
  *     </ul>
- * </p>
  *
  * @author davebaol
  * @author ShibaBandit

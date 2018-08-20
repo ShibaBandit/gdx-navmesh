@@ -1,5 +1,7 @@
 plugins {
-    id 'java'
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
 }
 
 group 'com.shibabandit'
@@ -10,11 +12,13 @@ sourceCompatibility = 1.8
 repositories {
     mavenCentral()
     jcenter()
+    mavenLocal()
 }
 
 ext {
     gdxVersion = '1.9.6'
     aiVersion = '1.8.1'
+    isReleaseVersion = !version.endsWith("SNAPSHOT")
 }
 
 dependencies {
@@ -26,4 +30,65 @@ dependencies {
     testCompile "com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion" // Should be for testing visually only
     testCompile "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop" // Should be for testing visually only
     testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    classifier = 'javadoc'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'gdx-navmesh'
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            pom {
+                name = 'gdx-navmesh'
+                description = 'LibGDX navigation mesh using constrained Delaunay triangulation.'
+                url = 'https://github.com/ShibaBandit/gdx-navmesh'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'ShibaBandit'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/ShibaBandit/gdx-navmesh'
+                    developerConnection = 'scm:git:ssh://github.com:ShibaBandit/gdx-navmesh'
+                    url = 'https://github.com/ShibaBandit/gdx-navmesh'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            // change URLs to point to your repos, e.g. http://my.org/repo
+            def releasesRepoUrl = "$buildDir/repos/releases"
+            def snapshotsRepoUrl = "$buildDir/repos/snapshots"
+            url = isReleaseVersion ? releasesRepoUrl : snapshotsRepoUrl
+        }
+    }
+}
+
+signing {
+    required { isReleaseVersion && gradle.taskGraph.hasTask("uploadArchives") }
+    sign publishing.publications.mavenJava
+}
+
+javadoc {
+    if(JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html4', true)
+    }
 }
