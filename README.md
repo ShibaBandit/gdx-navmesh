@@ -3,6 +3,7 @@
 Contents:
 
 - [Overview](#overview)
+  - [Dependency](#dependency)
 - [Examples](#examples)
 - [Issues](#issues)
 - [Contributing](#contributing)
@@ -12,6 +13,24 @@ Contents:
 ## Overview
 
 LibGDX navigation mesh using constrained Delaunay triangulation.
+
+#### Dependency
+
+###### Maven
+
+```xml
+<dependency>
+    <groupId>io.github.shibabandit</groupId>
+    <artifactId>gdx-navmesh</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+###### Gradle
+
+```
+compile 'io.github.shibabandit:gdx-navmesh:0.1.0'
+```
 
 ## Examples
 

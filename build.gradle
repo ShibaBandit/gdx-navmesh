@@ -4,8 +4,8 @@ plugins {
     id 'signing'
 }
 
-group 'com.shibabandit'
-version '0.1.0-SNAPSHOT'
+group 'io.github.shibabandit'
+version '0.1.0'
 
 sourceCompatibility = 1.8
 
@@ -75,9 +75,13 @@ publishing {
     repositories {
         maven {
             // change URLs to point to your repos, e.g. http://my.org/repo
-            def releasesRepoUrl = "$buildDir/repos/releases"
+            def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
             def snapshotsRepoUrl = "$buildDir/repos/snapshots"
             url = isReleaseVersion ? releasesRepoUrl : snapshotsRepoUrl
+            credentials {
+                username sonatypeUsername
+                password sonatypePassword
+            }
         }
     }
 }
