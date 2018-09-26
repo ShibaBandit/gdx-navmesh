@@ -153,7 +153,7 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
         startPosWorld = new Vector2(7.0625f, 11.354166f);
         endPosWorld = new Vector2(36.75f, 34.895836f);
 
-        navMeshPathFinder = new NavMeshPathFinder(new DistSqdHeuristic(), walkables, PF_REQUEST,
+        navMeshPathFinder = new NavMeshPathFinder(new CentroidDistHeuristic(), walkables, PF_REQUEST,
                 PF_RESPONSE,800f);
         navMeshStringPuller = new NavMeshStringPuller();
 

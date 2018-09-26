@@ -242,4 +242,11 @@ public class NavMeshPathFinder {
     public NavMeshGraph getNavMeshGraph() {
         return navMeshGraph;
     }
+
+    /**
+     * @return the underlying navigation mesh path finder
+     */
+    public IndexedNavMeshAStarPathFinder getPathFinder() {
+        return pathFinder;
+    }
 }

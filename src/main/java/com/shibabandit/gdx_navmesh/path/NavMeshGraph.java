@@ -32,7 +32,7 @@ public class NavMeshGraph implements INavMeshGraph<NavMeshPathNode> {
     /** Lookup for the navmesh node given a {@link DelaunayTriangle} */
     protected HashMap<DelaunayTriangle, NavMeshPathNode> triToNode;
 
-    /** Stores navmesh nodes for indexed lookup */
+    /** Stores navmesh nodes for spatially indexed lookup */
     protected final QtSearchIndex<NavMeshPathNode> nodesQt;
 
     /**
@@ -189,7 +189,17 @@ public class NavMeshGraph implements INavMeshGraph<NavMeshPathNode> {
         return node;
     }
 
+    /**
+     * @return all path nodes in the graph
+     */
     public Array<NavMeshPathNode> getNodes() {
         return nodes;
+    }
+
+    /**
+     * @return quadtree index for spatially indexed lookup of path nodes
+     */
+    public QtSearchIndex<NavMeshPathNode> getNodesQt() {
+        return nodesQt;
     }
 }

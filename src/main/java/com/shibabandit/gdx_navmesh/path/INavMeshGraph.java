@@ -7,5 +7,10 @@ import org.poly2tri.triangulation.delaunay.DelaunayTriangle;
  * @param <N> 
  */
 public interface INavMeshGraph<N extends NavMeshPathNode> extends IndexedGraph<NavMeshPathNode> {
+
+    /**
+     * @param triangle
+     * @return the navigation mesh node associated with the provided triangle
+     */
     N getNode(DelaunayTriangle triangle);
 }

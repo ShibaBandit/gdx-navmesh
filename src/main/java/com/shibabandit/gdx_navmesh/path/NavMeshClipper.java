@@ -61,7 +61,28 @@ public final class NavMeshClipper {
      * @return list of walkable Polygons
      */
     public Array<Polygon> clipToWalkables(Polygon bounds, Array<org.locationtech.jts.geom.Polygon> jtsObs) {
-        final Array<Polygon> simplePolys = new Array<>();
+        final Array<Geometry> jtsGeoms = clipToJtsWalkables(bounds, jtsObs);
+        final Array<Polygon> ptPolys = new Array<>(jtsGeoms.size);
+
+        // Convert from JTS
+        for(Geometry g : jtsGeoms) {
+            ptPolys.add(Poly2TriPolygonFactory.fromJtsPoly(g));
+        }
+
+        return ptPolys;
+    }
+
+
+    /**
+     * Return a list of walkable {@link Geometry}. Unions obstacles together and subtracts their area from the world
+     * bounds. Simplifies the resulting walkable polygons.
+     *
+     * @param bounds world bounds
+     * @param jtsObs list of obstacle JTS Polygon Geometry
+     * @return list of walkable Polygons
+     */
+    public Array<Geometry> clipToJtsWalkables(Polygon bounds, Array<org.locationtech.jts.geom.Polygon> jtsObs) {
+        final Array<Geometry> simplePolys = new Array<>();
 
         // Guard: no obstacles
         if(jtsObs.size < 1) {
@@ -84,9 +105,10 @@ public final class NavMeshClipper {
         tileBufferOp.setEndCapStyle(BufferParameters.CAP_SQUARE);
         final Geometry unionColl = tileBufferOp.getResultGeometry(bufferDist);
 
+        final Geometry simpleUnionColl = DouglasPeuckerSimplifier.simplify(unionColl, distTolerance).buffer(0d);
 
         // Subtract obstacles from walkable bounds
-        final Geometry boundsMinusObstacles = jtsBounds.difference(unionColl);
+        final Geometry boundsMinusObstacles = jtsBounds.difference(simpleUnionColl);
 
         // Unroll any geometry collections
         Array<Geometry> jtsWalkables = JtsUtil.flatList(boundsMinusObstacles);
@@ -100,7 +122,7 @@ public final class NavMeshClipper {
 
                 // Simplified geometry may be empty
                 if(!g.isEmpty()) {
-                    simplePolys.add(Poly2TriPolygonFactory.fromJtsPoly(g));
+                    simplePolys.add(g);
                 }
             }
         }
