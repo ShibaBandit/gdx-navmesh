@@ -35,14 +35,14 @@ See:
 <dependency>
     <groupId>io.github.shibabandit</groupId>
     <artifactId>gdx-navmesh</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
 ###### Gradle
 
 ```
-compile 'io.github.shibabandit:gdx-navmesh:0.1.0'
+compile 'io.github.shibabandit:gdx-navmesh:0.2.0'
 ```
 
 ## Examples
