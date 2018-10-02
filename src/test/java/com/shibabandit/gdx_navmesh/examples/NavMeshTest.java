@@ -5,7 +5,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.ai.msg.Telegram;
 import com.badlogic.gdx.ai.msg.Telegraph;
-import com.badlogic.gdx.ai.pfa.Connection;
 import com.badlogic.gdx.ai.pfa.DefaultGraphPath;
 import com.badlogic.gdx.backends.lwjgl.LwjglApplication;
 import com.badlogic.gdx.backends.lwjgl.LwjglApplicationConfiguration;
@@ -28,6 +27,9 @@ import org.poly2tri.Poly2Tri;
 import org.poly2tri.geometry.polygon.PolygonPoint;
 import org.poly2tri.triangulation.TriangulationPoint;
 import org.poly2tri.triangulation.delaunay.DelaunayTriangle;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class NavMeshTest implements ApplicationListener, Telegraph {
 
@@ -153,7 +155,7 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
         startPosWorld = new Vector2(7.0625f, 11.354166f);
         endPosWorld = new Vector2(36.75f, 34.895836f);
 
-        navMeshPathFinder = new NavMeshPathFinder(new CentroidDistHeuristic(), walkables, PF_REQUEST,
+        navMeshPathFinder = new NavMeshPathFinder(new PortalMidpointDistHeuristic(), walkables, PF_REQUEST,
                 PF_RESPONSE,800f);
         navMeshStringPuller = new NavMeshStringPuller();
 
@@ -218,10 +220,6 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
         if(latestPath != null) {
             draw(latestPath, COLOR_CLICKED, COLOR_PORTAL);
         }
-
-//        for(org.poly2tri.geometry.polygon.Polygon o : obstacles) {
-//            draw(o, COLOR_OBS, ShapeRenderer.ShapeType.Line);
-//        }
     }
 
     @Override
@@ -288,6 +286,20 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
                     dt.points[2].getXf(), dt.points[2].getYf());
         }
         shapeRenderer.end();
+
+        // Draw holes (obstacles)
+        final ArrayList<org.poly2tri.geometry.polygon.Polygon> holes = p.getHoles();
+        if(holes != null) {
+            shapeRenderer.setColor(COLOR_OBS);
+            for (org.poly2tri.geometry.polygon.Polygon nextHole : holes) {
+                final List<TriangulationPoint> points = nextHole.getPoints();
+                for (int i = 0; i < points.size(); ++i) {
+                    TriangulationPoint tpA = points.get(i);
+                    TriangulationPoint tpB = points.get((i + 1) % points.size());
+                    shapeRenderer.line(tpA.getXf(), tpA.getYf(), tpB.getXf(), tpB.getYf());
+                }
+            }
+        }
     }
 
     private void draw(DefaultGraphPath<NavMeshPathNode> path, Color meshColor, Color portalColor) {
@@ -295,36 +307,20 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
         shapeRenderer.begin();
         shapeRenderer.setColor(meshColor);
         for(NavMeshPathNode n : path) {
-            dt = n.getDelaunayTriangle();
-            shapeRenderer.triangle(
-                    dt.points[0].getXf(), dt.points[0].getYf(),
-                    dt.points[1].getXf(), dt.points[1].getYf(),
-                    dt.points[2].getXf(), dt.points[2].getYf());
+            dt = n.getDtA();
+            if(dt != null) {
+                shapeRenderer.triangle(
+                        dt.points[0].getXf(), dt.points[0].getYf(),
+                        dt.points[1].getXf(), dt.points[1].getYf(),
+                        dt.points[2].getXf(), dt.points[2].getYf());
+            }
         }
 
-
-        // 'Portals' test
-        // Have to reconstruct the edges due to API limitations from gdx-ai extension
-        NavMeshPathNode nextSrc, nextDest;
-        Array<Connection<NavMeshPathNode>> srcConns;
-        NavMeshPortal nextPortal;
-
-        shapeRenderer.setColor(portalColor);
-        for(int i = 0; i < path.getCount() - 1; ++i) {
-            nextSrc = path.get(i);
-            nextDest = path.get(i + 1);
-            srcConns = nextSrc.getConnections();
-
-            for(Connection<NavMeshPathNode> nextConn : srcConns) {
-                if(nextConn.getToNode() == nextDest) {
-                    nextPortal = ((NavMeshPathConn) nextConn).getPortal();
-
-                    // Draw portal
-                    shapeRenderer.line(nextPortal.getLeft(), nextPortal.getRight());
-
-                    break;
-                }
-            }
+        // 'Portals'
+        shapeRenderer.setColor(COLOR_PORTAL);
+        for(int i = 0; i < latestPath.getCount(); ++i) {
+            NavMeshPortal portal = latestPath.get(i).getPortal();
+            shapeRenderer.line(portal.getLeft(), portal.getRight());
         }
 
 
@@ -354,12 +350,18 @@ public class NavMeshTest implements ApplicationListener, Telegraph {
             case PF_RESPONSE:
                 final NavMeshPathRequest pfr = (NavMeshPathRequest)telegram.extraInfo;
                 latestPath = (DefaultGraphPath<NavMeshPathNode>) pfr.resultPath;
+                StringBuilder sb = new StringBuilder("Latest Path: ");
+                for(int i = 0; i < latestPath.nodes.size; ++i) {
+                    sb.append(latestPath.nodes.get(i).getPortal().getMidpoint());
+                    sb.append(", ");
+                }
+                System.out.println(sb);
 
                 if(latestPath.getCount() > 0) {
-                    final NavMeshPortal[] portals = NavMeshStringPuller.pathToPortals(latestPath, startPosWorld, endPosWorld);
+                    final NavMeshPortal[] portals = navMeshStringPuller.pathToPortals(latestPath);
                     pathPts = navMeshStringPuller.stringPull(startPosWorld, endPosWorld, portals, AGENT_RADIUS);
 
-                    final StringBuilder sb = new StringBuilder("Path Through Portals: ");
+                    sb = new StringBuilder("Path Through Portals: ");
                     for(int i = 0; i < pathPts.size; ++i) {
                         sb.append(pathPts.get(i));
                         sb.append(", ");

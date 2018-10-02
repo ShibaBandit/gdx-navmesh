@@ -47,7 +47,8 @@ public final class DelaunayTriangleUtil {
         return (intersects & 1) == 1;
     }
 
-    public static void dtGetEdge(DelaunayTriangle dt, int index, Vector2 ptA, Vector2 ptB) {
+    public static boolean dtGetEdge(DelaunayTriangle dt, int index, Vector2 ptA, Vector2 ptB) {
+        boolean success = false;
 
         // Edges:
         //
@@ -60,21 +61,62 @@ public final class DelaunayTriangleUtil {
                 if(dt.points[1] != null && dt.points[2] != null) {
                     ptA.set(dt.points[1].getXf(), dt.points[1].getYf());
                     ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                    success = true;
                 }
                 break;
             case 1:
                 if(dt.points[0] != null && dt.points[2] != null) {
                     ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
                     ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                    success = true;
                 }
                 break;
             case 2:
                 if(dt.points[0] != null && dt.points[1] != null) {
                     ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
                     ptB.set(dt.points[1].getXf(), dt.points[1].getYf());
+                    success = true;
                 }
                 break;
         }
+
+        return success;
+    }
+
+    public static boolean dtGetEdgeIfDelaunay(DelaunayTriangle dt, int index, Vector2 ptA, Vector2 ptB) {
+        boolean success = false;
+
+        // Edges:
+        //
+        // edge[0] = Edge(points[1], points[2])
+        // edge[1] = Edge(points[0], points[2])
+        // edge[2] = Edge(points[0], points[1])
+
+        switch (index) {
+            case 0:
+                if(dt.points[1] != null && dt.points[2] != null && dt.dEdge[0]) {
+                    ptA.set(dt.points[1].getXf(), dt.points[1].getYf());
+                    ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                    success = true;
+                }
+                break;
+            case 1:
+                if(dt.points[0] != null && dt.points[2] != null && dt.dEdge[1]) {
+                    ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
+                    ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                    success = true;
+                }
+                break;
+            case 2:
+                if(dt.points[0] != null && dt.points[1] != null && dt.dEdge[2]) {
+                    ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
+                    ptB.set(dt.points[1].getXf(), dt.points[1].getYf());
+                    success = true;
+                }
+                break;
+        }
+
+        return success;
     }
 
     public static boolean dtGetNeighborEdge(DelaunayTriangle dt, int index, Vector2 ptA, Vector2 ptB) {
@@ -105,6 +147,45 @@ public final class DelaunayTriangleUtil {
                     break;
                 case 2:
                     if(dt.points[0] != null && dt.points[1] != null) {
+                        ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
+                        ptB.set(dt.points[1].getXf(), dt.points[1].getYf());
+                        success = true;
+                    }
+                    break;
+            }
+        }
+
+        return success;
+    }
+
+    public static boolean dtGetNeighborEdgeIfDelaunay(DelaunayTriangle dt, int index, Vector2 ptA, Vector2 ptB) {
+        boolean success = false;
+
+        if(dt.neighbors[index] != null && dt.neighbors[index].isInterior()) {
+
+            // Neighbor edges:
+            //
+            // neighbors[0] = Edge(points[1], points[2])
+            // neighbors[1] = Edge(points[0], points[2])
+            // neighbors[2] = Edge(points[0], points[1])
+
+            switch (index) {
+                case 0:
+                    if(dt.points[1] != null && dt.points[2] != null && !dt.cEdge[0]) {
+                        ptA.set(dt.points[1].getXf(), dt.points[1].getYf());
+                        ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                        success = true;
+                    }
+                    break;
+                case 1:
+                    if(dt.points[0] != null && dt.points[2] != null && !dt.cEdge[1]) {
+                        ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
+                        ptB.set(dt.points[2].getXf(), dt.points[2].getYf());
+                        success = true;
+                    }
+                    break;
+                case 2:
+                    if(dt.points[0] != null && dt.points[1] != null && !dt.cEdge[2]) {
                         ptA.set(dt.points[0].getXf(), dt.points[0].getYf());
                         ptB.set(dt.points[1].getXf(), dt.points[1].getYf());
                         success = true;

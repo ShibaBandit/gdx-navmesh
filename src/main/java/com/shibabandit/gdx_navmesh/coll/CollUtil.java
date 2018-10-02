@@ -1,6 +1,5 @@
 package com.shibabandit.gdx_navmesh.coll;
 
-import com.shibabandit.gdx_navmesh.path.NavMeshPathNode;
 import org.locationtech.jts.geom.*;
 import org.poly2tri.triangulation.TriangulationPoint;
 import org.poly2tri.triangulation.delaunay.DelaunayTriangle;
@@ -25,8 +24,7 @@ public final class CollUtil {
         return new Polygon(jtsLinearRing, null, GF);
     }
 
-    public static Envelope setIndexEnvelope(NavMeshPathNode navMeshPathNode, Envelope envelope) {
-        final DelaunayTriangle dt = navMeshPathNode.getDelaunayTriangle();
+    public static Envelope setIndexEnvelope(DelaunayTriangle dt, Envelope envelope) {
         TriangulationPoint p;
 
         envelope.init();

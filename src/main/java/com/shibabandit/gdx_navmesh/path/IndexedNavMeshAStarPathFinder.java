@@ -20,9 +20,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ai.pfa.*;
 import com.badlogic.gdx.ai.pfa.indexed.IndexedAStarPathFinder;
 import com.badlogic.gdx.ai.pfa.indexed.IndexedGraph;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.BinaryHeap;
 import com.badlogic.gdx.utils.TimeUtils;
+
+import static com.shibabandit.gdx_navmesh.path.NavMeshPathRequest.END_NODE_INDEX;
+import static com.shibabandit.gdx_navmesh.path.NavMeshPathRequest.START_NODE_INDEX;
 
 /**
  * <p>Based on the {@link IndexedAStarPathFinder} by davebaol. Adapted due to OOP inheritance issues.</p>
@@ -49,6 +53,12 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
     /** The unique ID for each search run. Used to mark nodes. */
     private int searchId;
 
+    /** The current request context used for start and end node data. */
+    private NavMeshPathRequest currReq;
+
+    /** Avoid re-allocating connection arrays for dynamic start and end locations. */
+    private DynamicConnections dynConns;
+
     public IndexedNavMeshAStarPathFinder(IndexedGraph<NavMeshPathNode> graph) {
         this(graph, false);
     }
@@ -59,6 +69,7 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
         this.nodeRecords = (NodeRecord<NavMeshPathNode>[])new NodeRecord[graph.getNodeCount()];
         this.openList = new BinaryHeap<>();
         if (calculateMetrics) this.metrics = new Metrics();
+        this.dynConns = new DynamicConnections();
     }
 
     @Override
@@ -129,6 +140,7 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
 
         if(request instanceof NavMeshPathRequest) {
             final NavMeshPathRequest navMeshPathRequest = (NavMeshPathRequest) request;
+            currReq = navMeshPathRequest;
 
             long lastTime = TimeUtils.nanoTime();
 
@@ -174,7 +186,10 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
         return true;
     }
 
-    protected void initSearch(NavMeshPathNode startNode, NavMeshPathNode endNode, Heuristic<NavMeshPathNode> heuristic) {
+    protected void initSearch(NavMeshPathNode startNode,
+                              NavMeshPathNode endNode,
+                              Heuristic<NavMeshPathNode> heuristic) {
+
         if (metrics != null) metrics.reset();
 
         // Increment the search id
@@ -193,10 +208,14 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
         current = null;
     }
 
-    protected void visitChildren(NavMeshPathNode endNode, Heuristic<NavMeshPathNode> heuristic, float agentRadius) {
+    protected void visitChildren(NavMeshPathNode endNode,
+                                 Heuristic<NavMeshPathNode> heuristic,
+                                 float agentRadius) {
 
         // Get current node's outgoing connections
-        Array<Connection<NavMeshPathNode>> connections = graph.getConnections(current.node);
+        dynConns.init(current, graph, currReq);
+        final Array<Connection<NavMeshPathNode>> connections = dynConns.connections;
+
 
         // Loop through each connection in turn
         for (int i = 0; i < connections.size; i++) {
@@ -204,7 +223,7 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
 
             // Skip connection if agent fits through the portal
             final NavMeshPathConn connection = (NavMeshPathConn) connections.get(i);
-            if(agentRadius > connection.getPortal().getLengthDiv2()) {
+            if(agentRadius > connection.getToNode().getPortal().getLengthDiv2() && !connection.getToNode().getPortal().isIgnorePortalLength()) {
                 continue;
             }
 
@@ -245,7 +264,7 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
 
             // Update node record's cost and connection
             nodeRecord.costSoFar = nodeCost;
-            nodeRecord.connection = connection;
+            nodeRecord.connection = connection; // TODO: May need to copy conn contents for dyn links...
 
             // Add it to the open list with the estimated total cost
             addToOpenList(nodeRecord, nodeCost + nodeHeuristic);
@@ -272,7 +291,16 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
         // outPath.clear();
         while (current.connection != null) {
             outPath.add(current.node);
-            current = nodeRecords[current.connection.getFromNode().getIndex()];
+            int index = current.connection.getFromNode().getIndex();
+            if(index == NavMeshPathRequest.START_NODE_INDEX) {
+                current = currReq.getStartNodeRec();
+
+            } else if(index == NavMeshPathRequest.END_NODE_INDEX) {
+                current = currReq.getEndNodeRec();
+
+            } else {
+                current = nodeRecords[index];
+            }
         }
         outPath.add(startNode);
 
@@ -290,30 +318,55 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
     }
 
     protected NodeRecord<NavMeshPathNode> getNodeRecord(NavMeshPathNode node) {
+        NodeRecord<NavMeshPathNode> nr;
         int index = node.getIndex();
-        NodeRecord<NavMeshPathNode> nr = nodeRecords[index]; // TODO: EMPTY NODE RECORDS CAUSES CRASH HERE, NO GEOMETRY IN WORLD
-        if (nr != null) {
-            if (nr.searchId != searchId) {
+
+        if(index == START_NODE_INDEX) {
+            nr = currReq.getStartNodeRec();
+
+            if(nr.searchId != searchId) {
+                nr.searchId = searchId;
+            }
+
+        } else if(index == END_NODE_INDEX) {
+            nr = currReq.getEndNodeRec();
+
+            if(nr.searchId != searchId) {
+                nr.searchId = searchId;
+            }
+
+        } else {
+
+            nr = nodeRecords[index]; // TODO: EMPTY NODE RECORDS CAUSES CRASH HERE, NO GEOMETRY IN WORLD
+
+            if(nr == null) {
+                nr = nodeRecords[index] = new NodeRecord<>();
+                nr.node = node;
+                nr.searchId = searchId;
+
+            } else if(nr.searchId != searchId) {
                 nr.category = UNVISITED;
                 nr.searchId = searchId;
             }
-            return nr;
         }
-        nr = nodeRecords[index] = new NodeRecord<>();
-        nr.node = node;
-        nr.searchId = searchId;
+
         return nr;
     }
 
-    private static final int UNVISITED = 0;
-    private static final int OPEN = 1;
-    private static final int CLOSED = 2;
+    /** Status for {@link NodeRecord} */
+    public static final int UNVISITED = 0;
+
+    /** Status for {@link NodeRecord} */
+    public static final int OPEN = 1;
+
+    /** Status for {@link NodeRecord} */
+    public static final int CLOSED = 2;
 
     /**
      * @param <NavMeshPathNode>
      * @author davebaol
      */
-    private static class NodeRecord<NavMeshPathNode> extends BinaryHeap.Node {
+    public static class NodeRecord<NavMeshPathNode> extends BinaryHeap.Node {
 
         /** The reference to the node. */
         NavMeshPathNode node;
@@ -351,13 +404,78 @@ public class IndexedNavMeshAStarPathFinder implements PathFinder<NavMeshPathNode
         public int openListAdditions;
         public int openListPeak;
 
-        public Metrics () {
-        }
+        public Metrics () {}
 
         public void reset () {
             visitedNodes = 0;
             openListAdditions = 0;
             openListPeak = 0;
+        }
+    }
+
+    /**
+     * Provide dynamic connections based on starting and ending graph positions which are different
+     * between searches and do not require constructing an entirely new search graph.
+     */
+    private static class DynamicConnections {
+        private static final int MAX_CONN = 2 + 4; // start, end, up to 4 normal connections
+
+        public NavMeshPathConn start, end;
+        public NavMeshPortal startPortal, endPortal;
+        public final Array<Connection<NavMeshPathNode>> connections;
+
+        public DynamicConnections() {
+            connections = new Array<>(MAX_CONN);
+            start = new NavMeshPathConn();
+            end = new NavMeshPathConn();
+            startPortal = new NavMeshPortal();
+            endPortal = new NavMeshPortal();
+        }
+
+        public DynamicConnections init(NodeRecord<NavMeshPathNode> current, IndexedGraph<NavMeshPathNode> graph, NavMeshPathRequest currReq) {
+            connections.clear();
+
+            // Get current node's outgoing connections
+            int currNodeIndex = current.node.getIndex();
+
+            if(currNodeIndex == NavMeshPathRequest.END_NODE_INDEX) {
+                connections.addAll(currReq.endNode.connections);
+
+            } else if(currNodeIndex == NavMeshPathRequest.START_NODE_INDEX) {
+                connections.addAll(currReq.startNode.connections);
+
+            } else {
+                connections.addAll(graph.getConnections(current.node));
+
+                final Array<Connection<NavMeshPathNode>> endNodeConns = currReq.endNode.getConnections();
+                final Array<Connection<NavMeshPathNode>> startNodeConns = currReq.startNode.getConnections();
+                boolean connectEndNode = false;
+                boolean connectStartNode = false;
+                for(Connection<NavMeshPathNode> nextConn : endNodeConns) {
+                    if(nextConn.getToNode().getIndex() == currNodeIndex) {
+                        connectEndNode = true;
+                        break;
+                    }
+                }
+                for(Connection<NavMeshPathNode> nextConn : startNodeConns) {
+                    if(nextConn.getToNode().getIndex() == currNodeIndex) {
+                        connectStartNode = true;
+                        break;
+                    }
+                }
+                if(connectEndNode) {
+                    currReq.endNode.getPortal().setIgnorePortalLength(true);
+                    end.init(current.node, currReq.endNode);
+                    connections.add(end);
+                }
+                if(connectStartNode) {
+                    currReq.startNode.getPortal().setIgnorePortalLength(true);
+                    start.init(current.node, currReq.startNode);
+                    connections.add(start);
+                }
+            }
+
+            return this;
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.shibabandit.gdx_navmesh.path;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ai.msg.MessageManager;
 import com.badlogic.gdx.ai.msg.Telegraph;
 import com.badlogic.gdx.ai.pfa.Heuristic;
@@ -48,10 +49,10 @@ public class NavMeshPathFinder {
     protected final float nearbyWalkableTriMaxDist;
 
     /** Results from 'contained in triangle' search */
-    protected final Array<NavMeshPathNode> containedResults;
+    protected final Array<NavMeshGraph.QtTriNode> containedResults;
 
     /** Results from 'nearby triangle' search */
-    protected final Array<NavMeshPathNode> nearbyResults;
+    protected final Array<NavMeshGraph.QtTriNode> nearbyResults;
 
 
     //
@@ -83,7 +84,7 @@ public class NavMeshPathFinder {
         this.nearbyWalkableTriMaxDist = nearbyWalkableTriMaxDist;
         this.navMeshGraph = new NavMeshGraph(walkablePolys);
 
-        this.pathFinder = new IndexedNavMeshAStarPathFinder(navMeshGraph);
+        this.pathFinder = new IndexedNavMeshAStarPathFinder(navMeshGraph, true);
 
         this.pathFinderQueue = new PathFinderQueue<>(pathFinder);
         MessageManager.getInstance().addListener(pathFinderQueue, requestCode);
@@ -118,22 +119,20 @@ public class NavMeshPathFinder {
     public boolean findPath(Vector2 startPos, Vector2 endPos, float agentRadius, Telegraph telegraph) {
         boolean success = false;
 
-        final DelaunayTriangle startPosTri = getContainingTriangle(startPos);
-        final DelaunayTriangle endPosTri = getContainingTriangle(endPos);
+        final NavMeshGraph.QtTriNode startPosNode = getContainingNode(startPos);
+        final NavMeshGraph.QtTriNode endPosNode = getContainingNode(endPos);
 
-        if(startPosTri == null) {
-            System.out.println("Start pos tri null");
+        if(startPosNode == null) {
+            Gdx.app.debug(NavMeshPathFinder.class.getName(), "Start pos node null for pos: " + startPos);
 
-        } else if(endPosTri == null) {
-            System.out.println("End pos tri null for pos: " + endPos);
+        } else if(endPosNode == null) {
+            Gdx.app.debug(NavMeshPathFinder.class.getName(),"End pos node null for pos: " + endPos);
 
         } else {
 
             // Find path
-            final NavMeshPathNode startNode = navMeshGraph.getNode(startPosTri);
-            final NavMeshPathNode endNode = navMeshGraph.getNode(endPosTri);
             final NavMeshPathRequest pfRequest = Pools.get(NavMeshPathRequest.class)
-                    .obtain().init(heuristic, startNode, endNode, agentRadius, responseCode);
+                    .obtain().init(heuristic, startPosNode, endPosNode, agentRadius, startPos, endPos, responseCode);
 
             MessageManager.getInstance().dispatchMessage(telegraph, requestCode, pfRequest);
 
@@ -164,11 +163,11 @@ public class NavMeshPathFinder {
         nearbyResults.clear();
         navMeshGraph.nodesQt.itemsInRange(pos, nearbyWalkableTriMaxDist, nearbyResults);
 
-        NavMeshPathNode n;
+        NavMeshGraph.QtTriNode n;
         for(int ni = 0; ni < nearbyResults.size; ++ni) {
             n = nearbyResults.get(ni);
 
-            nextTriangle = n.getDelaunayTriangle();
+            nextTriangle = n.getDt();
             for(int i = 0; i < 3; ++i) {
 
                 // Only consider constrained edges (edges of non-walkable area)
@@ -177,24 +176,25 @@ public class NavMeshPathFinder {
                 }
 
                 // Load next triangle edge
-                dtGetEdge(nextTriangle, i, ptA, ptB);
+                if(dtGetEdge(nextTriangle, i, ptA, ptB)) {
 
-                // Compared distance from line to point
-                nextDist = Intersector.distanceSegmentPoint(ptA, ptB, pos);
-                if(nextDist < bestDist && nextDist < maxAllowedDist) {
+                    // Compared distance from line to point
+                    nextDist = Intersector.distanceSegmentPoint(ptA, ptB, pos);
+                    if (nextDist < bestDist && nextDist < maxAllowedDist) {
 
-                    Intersector.nearestSegmentPoint(ptA, ptB, pos, result);
+                        Intersector.nearestSegmentPoint(ptA, ptB, pos, result);
 
-                    // Inset by agent radius
-                    final float angleTo = Angles.dumbNormAngle(result.angle(pos));
-                    offset.set(1f, 0f).setAngle(angleTo).scl(agentRadius);
-                    result.add(offset);
+                        // Inset by agent radius
+                        final float angleTo = Angles.dumbNormAngle(result.angle(pos));
+                        offset.set(1f, 0f).setAngle(angleTo).scl(agentRadius);
+                        result.add(offset);
 
-                    // Must be walkable to update best
-                    if(isWalkable(result)) {
-                        bestTriangle = nextTriangle;
-                        bestEdge = i;
-                        bestDist = nextDist;
+                        // Must be walkable to update best
+                        if (isWalkable(result)) {
+                            bestTriangle = nextTriangle;
+                            bestEdge = i;
+                            bestDist = nextDist;
+                        }
                     }
                 }
             }
@@ -206,22 +206,22 @@ public class NavMeshPathFinder {
 
     /**
      * @param pos position to find containing triangle for
-     * @return the containing triangle for the position, or null if one could not be found
+     * @return the containing triangle node for the position, or null if one could not be found
      */
-    protected DelaunayTriangle getContainingTriangle(Vector2 pos) {
-        DelaunayTriangle containingTriangle = null;
+    protected NavMeshGraph.QtTriNode getContainingNode(Vector2 pos) {
+        NavMeshGraph.QtTriNode containingNode = null;
 
         containedResults.clear();
-        navMeshGraph.nodesQt.itemsInRange(pos, 10f, containedResults);
+        navMeshGraph.getNodesQt().itemsInRange(pos, 10f, containedResults); // TODO: 10f constant should be param...
 
-        for(NavMeshPathNode n : containedResults) {
-            if(dtContains(n.getDelaunayTriangle(), pos.x, pos.y)) {
-                containingTriangle = n.getDelaunayTriangle();
+        for(NavMeshGraph.QtTriNode n : containedResults) {
+            if(dtContains(n.getDt(), pos.x, pos.y)) {
+                containingNode = n;
                 break;
             }
         }
 
-        return containingTriangle;
+        return containingNode;
     }
 
     /**
@@ -233,7 +233,7 @@ public class NavMeshPathFinder {
      * @return true if the position is walkable
      */
     public boolean isWalkable(Vector2 pos) {
-        return getContainingTriangle(pos) != null;
+        return getContainingNode(pos) != null;
     }
 
     /**

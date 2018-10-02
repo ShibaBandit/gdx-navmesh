@@ -3,7 +3,6 @@ package com.shibabandit.gdx_navmesh.path;
 import com.badlogic.gdx.ai.pfa.DefaultGraphPath;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.Pools;
 
 /**
  * Adapted from http://digestingduck.blogspot.com/2010/03/simple-stupid-funnel-algorithm.html
@@ -23,30 +22,46 @@ public final class NavMeshStringPuller {
     }
 
     /**
-     * Convert a graph path to a list of portals to pass through. The first and second portals are the starting
-     * and ending positions.
+     * Convert a graph path to a list of portals to pass through. The first and last portals are the starting
+     * and ending positions. Repeated path points that occur directly one after the other will be removed.
      *
      * @param path graph solution
-     * @param startPos starting search position
-     * @param endPos ending search position
      * @return list of portals to pass through, where the first and last portal are start and end points respectively
      */
-    public static NavMeshPortal[] pathToPortals(DefaultGraphPath<NavMeshPathNode> path, Vector2 startPos, Vector2 endPos) {
-        final NavMeshPortal[] portals = new NavMeshPortal[Math.max(path.getCount() + 1, 0)];
+    public NavMeshPortal[] pathToPortals(DefaultGraphPath<NavMeshPathNode> path) {
 
-        // First portal is start position
-        portals[0] = Pools.get(NavMeshPortal.class).obtain().init(startPos, startPos);
+        int portalCount = 0;
+        for(int i = 0; i < path.getCount(); ++i) {
 
-        // Get portal list
-        NavMeshPathNode nextSrc, nextDest;
-        for(int i = 0; i < path.getCount() - 1; ++i) {
-            nextSrc = path.get(i);
-            nextDest = path.get(i + 1);
-            portals[i + 1] = nextSrc.portalTo(nextDest);
+            if(i > 0) {
+
+                // Ignore duplicate points
+                if(!vEqual(path.get(i).getPortal().getMidpoint(), path.get(i - 1).getPortal().getMidpoint())) {
+                    ++portalCount;
+                }
+
+            } else {
+                ++portalCount;
+            }
         }
 
-        // Last portal is end position
-        portals[portals.length - 1] = Pools.get(NavMeshPortal.class).obtain().init(endPos, endPos);
+        final NavMeshPortal[] portals = new NavMeshPortal[portalCount];
+
+        // Copy portal list
+        int portalIndex = 0;
+        for(int i = 0; i < path.getCount(); ++i) {
+
+            if(portalIndex > 0) {
+
+                // Ignore duplicate points
+                if(!vEqual(path.get(i).getPortal().getMidpoint(), path.get(i - 1).getPortal().getMidpoint())) {
+                    portals[portalIndex++] = path.get(i).getPortal();
+                }
+
+            } else {
+                portals[portalIndex++] = path.get(i).getPortal();
+            }
+        }
 
         return portals;
     }
@@ -138,6 +153,7 @@ public final class NavMeshStringPuller {
 
         for(int i = 1; i < portals.length; ++i) {
             isFinalPortal = (i == portals.length - 1);
+
             if(isFinalPortal) {
                 offset.setZero();
             } else {

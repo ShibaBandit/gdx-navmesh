@@ -2,55 +2,57 @@ package com.shibabandit.gdx_navmesh.path;
 
 import com.badlogic.gdx.ai.pfa.Connection;
 import com.badlogic.gdx.utils.Array;
-import com.shibabandit.gdx_navmesh.coll.CollUtil;
 import com.shibabandit.gdx_navmesh.coll.QtItem;
-import org.locationtech.jts.geom.Envelope;
 import org.poly2tri.triangulation.delaunay.DelaunayTriangle;
 
 /**
- * Navmesh path node that supports {@link org.locationtech.jts.index.quadtree.Quadtree} search and contains a
- * Delaunay Triangle. Fields left protected to support inheritance.
+ * Navmesh path node that supports {@link org.locationtech.jts.index.quadtree.Quadtree} search and lies on a
+ * Delaunay Triangle walkable portal. Fields left protected to support inheritance.
  *
  * @see IndexedNavMeshAStarPathFinder
  * @see org.locationtech.jts.index.quadtree.Quadtree
  * @see QtItem
  * @see DelaunayTriangle
  */
-public class NavMeshPathNode implements QtItem {
+public class NavMeshPathNode {
 
-    /** Connections to neighboring navmesh nodes that share a walkable edge */
+    /** Connections to neighboring navmesh nodes: any portals open to the two triangles that this node lies on. */
     protected final Array<Connection<NavMeshPathNode>> connections;
 
     /** Global graph index for fast lookup */
     protected final int index;
 
-    /** The triangle geometry represented by this path node */
-    protected final DelaunayTriangle delaunayTriangle;
+    /** The first triangle geometry shared by this portal */
+    protected DelaunayTriangle dtA;
 
-    /** Bounding envelope for {@link #delaunayTriangle} */
-    protected final Envelope envelope;
+    /** The second triangle geometry shared by this portal */
+    protected DelaunayTriangle dtB;
+
+    /** The actual spatial data for the path node. The midpoint should be used as the node location. */
+    protected final NavMeshPortal portal;
 
     /**
      * @param index global graph index for fast lookup
-     * @param delaunayTriangle the triangle geometry represented by this path node
+     * @param portal the actual spatial data for the path node
      */
-    public NavMeshPathNode(int index, DelaunayTriangle delaunayTriangle) {
+    public NavMeshPathNode(int index,
+                           NavMeshPortal portal) {
 
-        // Triangles will have a maximum of 3 shared edges
-        this(new Array<>(3), index, delaunayTriangle);
+        // Portal nodes will have a maximum of 4 shared edges
+        this(new Array<>(4), index, portal);
     }
 
     /**
-     * @param connections connections to neighboring navmesh nodes that share a walkable edge
+     * @param connections connections to neighboring navmesh nodes
      * @param index global graph index for fast lookup
-     * @param delaunayTriangle the triangle geometry represented by this path node
+     * @param portal the actual spatial data for the path node
      */
-    public NavMeshPathNode(Array<Connection<NavMeshPathNode>> connections, int index, DelaunayTriangle delaunayTriangle) {
+    public NavMeshPathNode(Array<Connection<NavMeshPathNode>> connections,
+                           int index,
+                           NavMeshPortal portal) {
         this.connections = connections;
         this.index = index;
-        this.delaunayTriangle = delaunayTriangle;
-        this.envelope = new Envelope();
-        CollUtil.setIndexEnvelope(this, envelope);
+        this.portal = portal;
     }
 
     /**
@@ -69,43 +71,48 @@ public class NavMeshPathNode implements QtItem {
     }
 
     /**
-     * @return the triangle geometry represented by this path node
+     * @return the first triangle connected to this portal node
      */
-    public DelaunayTriangle getDelaunayTriangle() {
-        return delaunayTriangle;
+    public DelaunayTriangle getDtA() {
+        return dtA;
     }
 
-    @Override
-    public Envelope getEnvelope() {
-        return envelope;
+    /**
+     * @param dtA the first triangle connected to this portal node
+     */
+    public void setDtA(DelaunayTriangle dtA) {
+        this.dtA = dtA;
+    }
+
+    /**
+     * @return the second triangle connected to this portal node
+     */
+    public DelaunayTriangle getDtB() {
+        return dtB;
+    }
+
+    /**
+     * @param dtB the second triangle connected to this portal node
+     */
+    public void setDtB(DelaunayTriangle dtB) {
+        this.dtB = dtB;
+    }
+
+    /**
+     * @return spatial data for the path node
+     */
+    public NavMeshPortal getPortal() {
+        return portal;
     }
 
     @Override
     public String toString() {
         return "NavMeshPathNode{" +
-                "index=" + index +
-                ", delaunayTriangle=" + delaunayTriangle +
+                "connections=" + connections +
+                ", index=" + index +
+                ", dtA=" + dtA +
+                ", dtB=" + dtB +
+                ", portal=" + portal +
                 '}';
-    }
-
-    /**
-     * Get the shared portal between two directly connected path finding nodes. The result is null if there
-     * is not a direct connection.
-     *
-     * @param dest directly neighboring path node
-     * @return the walkable portal between this node and dest node, or null if there is not a shared portal edge
-     */
-    public NavMeshPortal portalTo(NavMeshPathNode dest) {
-        NavMeshPortal navMeshPortal = null;
-
-        // Have to reconstruct the edges due to API limitations from gdx-ai extension
-        for(Connection<NavMeshPathNode> nextConn : connections) {
-            if(nextConn.getToNode() == dest) {
-                navMeshPortal = ((NavMeshPathConn) nextConn).getPortal();
-                break;
-            }
-        }
-
-        return navMeshPortal;
     }
 }
